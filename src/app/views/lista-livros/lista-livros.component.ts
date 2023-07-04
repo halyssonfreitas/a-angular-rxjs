@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { FormControl } from '@angular/forms';
-import { debounceTime, filter, map, switchMap, tap } from 'rxjs';
-import { Item, Livro } from 'src/app/models/interfaces';
+import { EMPTY, catchError, debounceTime, distinctUntilChanged, filter, map, of, switchMap, tap, throwError } from 'rxjs';
+import { Item, Livro, LivrosResultado } from 'src/app/models/interfaces';
 import { LivroVolumeInfo } from 'src/app/models/livroVolumeInfo';
 import { LivroService } from 'src/app/service/livro.service';
 
@@ -15,7 +15,8 @@ const PAUSA = 500;
 export class ListaLivrosComponent {
 
   campoBusca = new FormControl();
-  livro: Livro;
+  mensagemErro = '';
+  livrosResultado: LivrosResultado;
 
   constructor(
     private livroService: LivroService
@@ -25,10 +26,18 @@ export class ListaLivrosComponent {
     .pipe(
       debounceTime(PAUSA),
       filter((valorDigitado) => valorDigitado.length >= 3),
-      tap(() => console.log('Fluxo inicial')),
+      distinctUntilChanged(),
       switchMap((valorDigitado) => this.livroService.buscar(valorDigitado)),
+      map(resultado => this.livrosResultado = resultado),
       tap((retornoAPI) => console.log(retornoAPI)),
-      map((itens: Item[]) => this.livrosResultadoParaLivros(itens))
+      map(resultaAPI => resultaAPI.items ?? []),
+      map((itens: Item[]) => this.livrosResultadoParaLivros(itens)),
+      catchError((erro) => {
+        this.mensagemErro = 'Ops, ocorreu um erro. REcarregue a aplicação!'
+        return EMPTY
+        console.log(erro)
+        return throwError(() => new Error(this.mensagemErro))
+      })
     )
 
   livrosResultadoParaLivros(itens: Item[]): LivroVolumeInfo[] {
