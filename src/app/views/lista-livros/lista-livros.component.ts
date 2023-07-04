@@ -1,36 +1,35 @@
-import { Component, OnDestroy } from '@angular/core';
-import { Subscription } from 'rxjs';
-import { Item, Livro, LivrosResultado } from 'src/app/models/interfaces';
+import { Component } from '@angular/core';
+import { FormControl } from '@angular/forms';
+import { debounceTime, filter, map, switchMap, tap } from 'rxjs';
+import { Item, Livro } from 'src/app/models/interfaces';
 import { LivroVolumeInfo } from 'src/app/models/livroVolumeInfo';
 import { LivroService } from 'src/app/service/livro.service';
+
+const PAUSA = 500;
 
 @Component({
   selector: 'app-lista-livros',
   templateUrl: './lista-livros.component.html',
   styleUrls: ['./lista-livros.component.css']
 })
-export class ListaLivrosComponent implements OnDestroy {
+export class ListaLivrosComponent {
 
-  listaLivros: LivroVolumeInfo[];
-  campoBusca : string = '';
-  subscription: Subscription;
+  campoBusca = new FormControl();
   livro: Livro;
 
   constructor(
-    private livroService : LivroService
+    private livroService: LivroService
   ) { }
 
-  buscarLivros() {
-    this.subscription = this.livroService
-      .buscar(this.campoBusca)
-      .subscribe({
-        next: (itens:Item[]) => {
-          this.listaLivros = this.livrosResultadoParaLivros(itens)
-        },
-        error: erro => console.error(erro),
-        complete: () => console.log('Observable completado')
-      })
-  }
+  livrosEncontrados$ = this.campoBusca.valueChanges
+    .pipe(
+      debounceTime(PAUSA),
+      filter((valorDigitado) => valorDigitado.length >= 3),
+      tap(() => console.log('Fluxo inicial')),
+      switchMap((valorDigitado) => this.livroService.buscar(valorDigitado)),
+      tap((retornoAPI) => console.log(retornoAPI)),
+      map((itens: Item[]) => this.livrosResultadoParaLivros(itens))
+    )
 
   livrosResultadoParaLivros(itens: Item[]): LivroVolumeInfo[] {
     return itens.map(item => {
@@ -38,9 +37,6 @@ export class ListaLivrosComponent implements OnDestroy {
     })
   }
 
-  ngOnDestroy(): void {
-    this.subscription.unsubscribe()
-  }
 
 }
 
